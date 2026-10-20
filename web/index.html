@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Legal Qwen 7B · 双模式法律助手</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --panel: #ffffff;
+    --ink: #1b2430;
+    --muted: #6a7482;
+    --line: #dfe3e8;
+    --brand: #1f3a5f;
+    --brand-soft: #eaeff6;
+    --accent: #a8791f;
+    --ok: #1f7a4d;
+    --err: #b23a3a;
+    --radius: 10px;
+    --mono: "Cascadia Mono", Consolas, "Courier New", monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Microsoft YaHei", "PingFang SC", system-ui, -apple-system, sans-serif;
+    line-height: 1.65;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 24px 20px 48px; }
+
+  header.top {
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    padding: 8px 0 20px; border-bottom: 1px solid var(--line); margin-bottom: 22px;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand h1 { font-size: 20px; margin: 0; letter-spacing: .3px; }
+  .brand p { margin: 0; font-size: 12.5px; color: var(--muted); }
+  .mark {
+    width: 40px; height: 40px; border-radius: 9px; background: var(--brand);
+    display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 17px;
+  }
+  .status {
+    margin-left: auto; font-size: 12.5px; padding: 6px 12px; border-radius: 999px;
+    border: 1px solid var(--line); background: var(--panel); color: var(--muted);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .dot.ok { background: var(--ok); }
+  .dot.err { background: var(--err); }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 18px 20px; margin-bottom: 18px;
+  }
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tab {
+    border: 1px solid var(--line); background: #fff; color: var(--muted);
+    padding: 8px 18px; border-radius: 999px; font-size: 14px; cursor: pointer;
+    transition: .15s;
+  }
+  .tab:hover { border-color: var(--brand); color: var(--brand); }
+  .tab.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+
+  .lbl { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  textarea {
+    width: 100%; min-height: 118px; resize: vertical; padding: 12px 14px;
+    border: 1px solid var(--line); border-radius: 8px; font-size: 14px;
+    font-family: inherit; color: var(--ink); background: #fcfcfd;
+  }
+  textarea:focus, input:focus { outline: 2px solid var(--brand-soft); border-color: var(--brand); }
+
+  .row { display: flex; align-items: center; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+  .grow { flex: 1; }
+  .btn {
+    border: 1px solid var(--line); background: #fff; color: var(--ink); cursor: pointer;
+    padding: 9px 20px; border-radius: 8px; font-size: 14px; transition: .15s;
+  }
+  .btn:hover { border-color: var(--brand); color: var(--brand); }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn.primary:hover { background: #27496f; }
+  .btn:disabled { opacity: .55; cursor: not-allowed; }
+  .timer { font-size: 12.5px; color: var(--accent); font-family: var(--mono); }
+
+  .hint { font-size: 12.5px; color: var(--muted); margin-top: 10px; }
+  .adv { margin-top: 14px; border-top: 1px dashed var(--line); padding-top: 12px; }
+  .adv summary { cursor: pointer; font-size: 13px; color: var(--brand); }
+  .adv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-top: 12px; }
+  .adv-grid label { font-size: 12.5px; color: var(--muted); display: block; margin-bottom: 4px; }
+  .adv-grid input[type=text], .adv-grid input[type=password] {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px;
+    font-size: 13px; font-family: var(--mono);
+  }
+  .check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+  .panel h2 {
+    font-size: 14px; margin: 0 0 10px; color: var(--brand);
+    padding-left: 9px; border-left: 3px solid var(--brand);
+  }
+  .panel h2 + * { margin-top: 0; }
+  .panel h2:not(:first-child) { margin-top: 22px; }
+  .out {
+    margin: 0; padding: 14px; background: #fbfcfd; border: 1px solid var(--line);
+    border-radius: 8px; font-family: inherit; font-size: 14px; white-space: pre-wrap;
+    word-break: break-word; min-height: 64px; color: var(--ink);
+  }
+  .out.empty { color: var(--muted); font-style: italic; }
+  .out.error { border-color: #eccfcf; background: #fdf6f6; color: var(--err); }
+
+  .grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .field { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; background: #fbfcfd; }
+  .field h3 { font-size: 12.5px; margin: 0 0 8px; color: var(--muted); font-weight: 600; }
+  .field ul { margin: 0; padding-left: 18px; font-size: 13.5px; }
+  .field li { margin: 3px 0; }
+  .field li.none { color: var(--muted); list-style: none; margin-left: -18px; }
+
+  footer { margin-top: 26px; font-size: 12px; color: var(--muted); text-align: center; }
+  @media (max-width: 640px) {
+    .status { margin-left: 0; }
+    .card { padding: 15px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="mark">LQ</div>
+      <div>
+        <h1>Legal Qwen 7B</h1>
+        <p>QLoRA 微调 · 本地模式 / 专家模式双工作流</p>
+      </div>
+    </div>
+    <div class="status"><span class="dot" id="dot"></span><span id="statusText">检测中…</span></div>
+  </header>
+
+  <section class="card">
+    <div class="tabs">
+      <button class="tab active" data-mode="local">本地模式</button>
+      <button class="tab" data-mode="expert">专家模式</button>
+    </div>
+    <label class="lbl" for="question">案情描述 / 法律问题</label>
+    <textarea id="question" placeholder="例如：2023年5月，张三向李四借款20万元……请问该借款合同是否有效？李四能否主张利息？"></textarea>
+    <div class="row">
+      <button class="btn" id="sample">填入示例</button>
+      <span class="grow"></span>
+      <span class="timer" id="timer"></span>
+      <button class="btn" id="clear">清空</button>
+      <button class="btn primary" id="run">提交</button>
+    </div>
+    <div class="hint" id="hint">本地模式：问题只在本机 Ollama 处理，不产生任何外发请求。</div>
+
+    <details class="adv" id="advBox" hidden>
+      <summary>专家模式云端配置（可选）</summary>
+      <div class="adv-grid">
+        <div>
+          <label for="cloudKey">云端 API Key</label>
+          <input type="password" id="cloudKey" placeholder="留空则读环境变量 CLOUD_API_KEY">
+        </div>
+        <div>
+          <label for="cloudBase">云端地址（OpenAI 兼容）</label>
+          <input type="text" id="cloudBase" value="https://api.deepseek.com/v1">
+        </div>
+        <div>
+          <label for="cloudModel">云端模型名</label>
+          <input type="text" id="cloudModel" value="deepseek-chat">
+        </div>
+      </div>
+      <label class="check"><input type="checkbox" id="mockCloud"> 使用内置 mock 云端（无 Key 时自测三层链路）</label>
+    </details>
+  </section>
+
+  <section class="card panel" id="localPanel">
+    <h2>本地模型答复</h2>
+    <pre class="out empty" id="localOut">尚未提交问题。</pre>
+  </section>
+
+  <section class="card panel" id="expertPanel" hidden>
+    <h2>第一层 · 本地要素抽取</h2>
+    <div class="grid3">
+      <div class="field"><h3>法律主体</h3><ul id="fSubjects"><li class="none">—</li></ul></div>
+      <div class="field"><h3>争议焦点</h3><ul id="fFocus"><li class="none">—</li></ul></div>
+      <div class="field"><h3>涉及法条</h3><ul id="fArticles"><li class="none">—</li></ul></div>
+    </div>
+    <h2>第二层 · 云端专业分析（草稿）</h2>
+    <pre class="out empty" id="draftOut">尚未提交问题。</pre>
+    <h2>第三层 · 本地法言法语润色（终稿）</h2>
+    <pre class="out empty" id="finalOut">尚未提交问题。</pre>
+  </section>
+
+  <footer>legal-ai-tutor · 本地推理基于 Ollama / legal-qwen，专家模式云端接口可按需替换</footer>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const SAMPLE = "2023年5月，张三向李四借款20万元用于经营周转，双方口头约定月息2分，未签订书面合同。"
+  + "到期后张三拒不还款，李四多次催讨无果，现李四想起诉张三，请问该借款合同是否有效？李四能否主张利息？";
+
+let mode = "local";
+let busy = false;
+
+function setStatus(cls, text) {
+  $("dot").className = "dot " + cls;
+  $("statusText").textContent = text;
+}
+
+async function refreshHealth() {
+  try {
+    const r = await fetch("/api/health");
+    const d = await r.json();
+    if (!d.ollama_ok) {
+      setStatus("err", "Ollama 未连接 · " + d.ollama_base_url);
+    } else if (!d.local_model_ready) {
+      setStatus("err", "模型 " + d.local_model + " 未安装（仅检测到 " + (d.models.join(", ") || "0 个") + "）");
+    } else {
+      setStatus("ok", "Ollama 在线 · " + d.local_model + (d.cloud_key_configured ? " · 云端 Key 已配置" : ""));
+    }
+  } catch (e) {
+    setStatus("err", "服务未响应");
+  }
+}
+
+function renderOutput(el, text, isError) {
+  el.textContent = text;
+  el.className = "out" + (isError ? " error" : "");
+}
+
+function renderList(el, items) {
+  el.innerHTML = "";
+  const arr = (items && items.length) ? items : [];
+  if (!arr.length || (arr.length === 1 && arr[0] === "未提及")) {
+    const li = document.createElement("li");
+    li.className = "none";
+    li.textContent = "未提及";
+    el.appendChild(li);
+    return;
+  }
+  arr.forEach((t) => {
+    const li = document.createElement("li");
+    li.textContent = t;
+    el.appendChild(li);
+  });
+}
+
+function setBusy(state) {
+  busy = state;
+  $("run").disabled = state;
+  $("run").textContent = state ? "处理中…" : "提交";
+}
+
+async function run() {
+  if (busy) return;
+  const question = $("question").value.trim();
+  if (!question) { $("question").focus(); return; }
+
+  setBusy(true);
+  const started = Date.now();
+  $("timer").textContent = "";
+  const tick = setInterval(() => {
+    $("timer").textContent = "已用时 " + ((Date.now() - started) / 1000).toFixed(1) + "s";
+  }, 100);
+
+  try {
+    if (mode === "local") {
+      const out = $("localOut");
+      renderOutput(out, "本地模型推理中，请稍候…", false);
+      const r = await fetch("/api/local", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || ("HTTP " + r.status));
+      renderOutput(out, d.answer, false);
+    } else {
+      const body = {
+        question,
+        cloud_api_key: $("cloudKey").value.trim() || null,
+        cloud_api_base: $("cloudBase").value.trim() || null,
+        cloud_model: $("cloudModel").value.trim() || null,
+        use_mock_cloud: $("mockCloud").checked,
+      };
+      $("draftOut").textContent = "三层流水线执行中，请稍候…";
+      const r = await fetch("/api/expert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const d = await r.json();
+      if (!r.ok) {
+        renderOutput($("draftOut"), d.detail || ("HTTP " + r.status), true);
+        return;
+      }
+      renderList($("fSubjects"), d.elements.legal_subjects);
+      renderList($("fFocus"), d.elements.dispute_focus);
+      renderList($("fArticles"), d.elements.legal_articles);
+      renderOutput($("draftOut"), d.cloud_draft, false);
+      renderOutput($("finalOut"), d.final_answer, false);
+    }
+  } catch (e) {
+    renderOutput(mode === "local" ? $("localOut") : $("draftOut"), "请求失败：" + e.message, true);
+  } finally {
+    clearInterval(tick);
+    $("timer").textContent = "耗时 " + ((Date.now() - started) / 1000).toFixed(1) + "s";
+    setBusy(false);
+  }
+}
+
+document.querySelectorAll(".tab").forEach((tab) => {
+  tab.addEventListener("click", () => {
+    mode = tab.dataset.mode;
+    document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t === tab));
+    const isExpert = mode === "expert";
+    $("localPanel").hidden = isExpert;
+    $("expertPanel").hidden = !isExpert;
+    $("advBox").hidden = !isExpert;
+    $("hint").textContent = isExpert
+      ? "专家模式：本地抽取三要素 → 云端生成专业分析 → 本地润色为法言法语。"
+      : "本地模式：问题只在本机 Ollama 处理，不产生任何外发请求。";
+  });
+});
+
+$("run").addEventListener("click", run);
+$("sample").addEventListener("click", () => { $("question").value = SAMPLE; });
+$("clear").addEventListener("click", () => {
+  $("question").value = "";
+  renderOutput($("localOut"), "尚未提交问题。", false);
+  renderOutput($("draftOut"), "尚未提交问题。", false);
+  renderOutput($("finalOut"), "尚未提交问题。", false);
+  renderList($("fSubjects"), []); renderList($("fFocus"), []); renderList($("fArticles"), []);
+  $("timer").textContent = "";
+});
+$("question").addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") run();
+});
+
+refreshHealth();
+setInterval(refreshHealth, 20000);
+</script>
+</body>
+</html>
