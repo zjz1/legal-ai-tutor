@@ -21,6 +21,15 @@ from .logging_setup import configure_logging
 from .runtime import build_runtime
 
 
+def _force_utf8() -> None:
+    """Windows 控制台默认 cp1252，直接打印中文会抛 UnicodeEncodeError。"""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
+        except (AttributeError, ValueError):
+            pass
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="legal-ai-tutor", description="法律 AI 助手命令行")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -46,6 +55,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    _force_utf8()
     args = _build_parser().parse_args(argv)
     settings = load_settings()
     configure_logging(settings.log_level)
