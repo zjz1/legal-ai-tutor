@@ -86,6 +86,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"法条库：{len(runtime.corpus)} 条")
         print(f"检索器：{'就绪' if runtime.retriever else '为空（请检查 LAW_DIR 下的 sample_articles.jsonl）'}")
         print(f"提供方：{settings.provider} / 实际模型：{runtime.router.local.model}")
+        exists = "存在" if settings.model_dir.is_dir() else "不存在"
+        print(f"模型目录：{settings.model_dir}（{exists}）")
         return 0
 
     return 1

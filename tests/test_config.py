@@ -48,3 +48,15 @@ def test_cloud_key_marks_configured():
 def test_relative_law_dir_is_resolved():
     settings = load_settings({"LAW_DIR": "data/laws"})
     assert settings.law_dir.is_absolute()
+
+
+def test_model_dir_defaults_to_project_models():
+    settings = load_settings({})
+    assert settings.model_dir.name == "models"
+    assert settings.model_file("legal-qwen-q4.gguf").name == "legal-qwen-q4.gguf"
+
+
+def test_model_dir_can_point_to_another_disk(tmp_path):
+    settings = load_settings({"MODEL_DIR": str(tmp_path)})
+    assert settings.model_dir == tmp_path
+    assert settings.model_file("x.gguf") == tmp_path / "x.gguf"

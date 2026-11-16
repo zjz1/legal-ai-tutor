@@ -82,6 +82,12 @@ def _bool(env: Mapping[str, str], name: str, default: bool) -> bool:
     raise ConfigError(f"环境变量 {name} 必须是 true/false，当前值为 {raw!r}")
 
 
+def _path(env: Mapping[str, str], name: str, default: Path) -> Path:
+    """读取路径型配置；相对路径按项目根解析。"""
+    raw = Path(_get(env, name, str(default))).expanduser()
+    return raw if raw.is_absolute() else (PROJECT_ROOT / raw).resolve()
+
+
 @dataclass(frozen=True)
 class Settings:
     """一次加载、全局只读的配置快照。"""
@@ -102,12 +108,16 @@ class Settings:
     rate_limit_per_minute: int
     allow_client_key: bool
     law_dir: Path
+    model_dir: Path
     log_level: str
     temperature: float
 
     @property
     def has_cloud(self) -> bool:
         return bool(self.cloud_api_key)
+
+    def model_file(self, name: str) -> Path:
+        return self.model_dir / name
 
 
 def load_settings(env: Mapping[str, str] | None = None) -> Settings:
@@ -123,9 +133,8 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
             hint="离线开发用 mock；本地模型用 ollama；云端用 openai",
         )
 
-    law_dir = Path(_get(env, "LAW_DIR", str(PROJECT_ROOT / "data" / "laws"))).expanduser()
-    if not law_dir.is_absolute():
-        law_dir = (PROJECT_ROOT / law_dir).resolve()
+    law_dir = _path(env, "LAW_DIR", PROJECT_ROOT / "data" / "laws")
+    model_dir = _path(env, "MODEL_DIR", PROJECT_ROOT / "models")
 
     return Settings(
         provider=provider,
@@ -144,6 +153,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         rate_limit_per_minute=_int(env, "RATE_LIMIT_PER_MINUTE", 30, minimum=1),
         allow_client_key=_bool(env, "ALLOW_CLIENT_KEY", False),
         law_dir=law_dir,
+        model_dir=model_dir,
         log_level=_get(env, "LOG_LEVEL", "INFO").upper(),
         temperature=_float(env, "TEMPERATURE", 0.3, minimum=0.0),
     )
