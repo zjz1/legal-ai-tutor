@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: 代码风格检查
+        run: ruff check .
+
+      - name: 单元测试（全程 Mock，无需模型服务）
+        run: pytest -q
+
+      - name: 评估冒烟（Mock 管线，验证指标计算链路）
+        run: python -m legal_ai_tutor.cli eval --dataset eval/samples.jsonl --limit 5 --out eval/reports/ci.json

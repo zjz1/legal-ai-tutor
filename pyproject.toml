@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "legal-ai-tutor"
+version = "0.2.0"
+description = "法律 AI 助手：本地 / 云端双 Provider 接入，三层专家工作流，法条 RAG 与引用校验"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn>=0.27",
+    "pydantic>=2.6",
+    "httpx>=0.27",
+    "requests>=2.31",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+]
+
+[project.scripts]
+legal-ai-tutor = "legal_ai_tutor.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+# data/ 为数据脚本、scripts/ 为本地工具，不参与代码风格门禁
+extend-exclude = ["data", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+# UP009：保留显式编码声明，便于 Windows 旧编辑器识别中文源码
+ignore = ["E501", "UP009"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

@@ -1,0 +1,32 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      LLM_PROVIDER: ollama
+      OLLAMA_BASE_URL: http://ollama:11434
+      LOCAL_MODEL: legal-qwen
+      MAX_CONCURRENCY: "1"
+    depends_on:
+      - ollama
+    volumes:
+      - ./data:/app/data
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama:/root/.ollama
+    # 需要 GPU 时取消下面注释（宿主需安装 nvidia-container-toolkit）
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+volumes:
+  ollama:

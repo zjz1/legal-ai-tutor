@@ -1,7 +1,13 @@
 # legal-ai-tutor 运行依赖
 # 安装：pip install -r requirements.txt
+# 说明：离线骨架只依赖以下包，Mock 模式无需任何模型服务
 
-requests>=2.31.0
 fastapi>=0.110.0
 uvicorn>=0.27.0
 pydantic>=2.6.0
+httpx>=0.27.0
+requests>=2.31.0
+
+# 开发/测试
+pytest>=8.0.0
+ruff>=0.6.0
