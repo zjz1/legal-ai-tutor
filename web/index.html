@@ -151,22 +151,11 @@
     <div class="hint" id="hint">本地模式：问题只在本机 Ollama 处理，不产生任何外发请求。</div>
 
     <details class="adv" id="advBox" hidden>
-      <summary>专家模式云端配置（可选）</summary>
-      <div class="adv-grid">
-        <div>
-          <label for="cloudKey">云端 API Key</label>
-          <input type="password" id="cloudKey" placeholder="留空则读环境变量 CLOUD_API_KEY">
-        </div>
-        <div>
-          <label for="cloudBase">云端地址（OpenAI 兼容）</label>
-          <input type="text" id="cloudBase" value="https://api.deepseek.com/v1">
-        </div>
-        <div>
-          <label for="cloudModel">云端模型名</label>
-          <input type="text" id="cloudModel" value="deepseek-chat">
-        </div>
-      </div>
-      <label class="check"><input type="checkbox" id="mockCloud"> 使用内置 mock 云端（无 Key 时自测三层链路）</label>
+      <summary>专家模式说明</summary>
+      <p class="hint" style="margin-top:10px">
+        云端 Key 仅在服务端通过环境变量 <code>CLOUD_API_KEY</code> 配置，前端不再传输。
+        未配置云端时，专家模式自动降级为本地分析，并在结果中标注 degraded。
+      </p>
     </details>
   </section>
 
@@ -208,12 +197,15 @@ async function refreshHealth() {
   try {
     const r = await fetch("/api/health");
     const d = await r.json();
-    if (!d.ollama_ok) {
-      setStatus("err", "Ollama 未连接 · " + d.ollama_base_url);
-    } else if (!d.local_model_ready) {
-      setStatus("err", "模型 " + d.local_model + " 未安装（仅检测到 " + (d.models.join(", ") || "0 个") + "）");
+    const local = d.local || {};
+    if (d.provider === "mock") {
+      setStatus("ok", "离线 Mock 模式 · " + (local.model || "mock"));
+    } else if (!local.ok) {
+      setStatus("err", "本地模型未连接 · " + (local.detail || ""));
+    } else if (local.model_ready === false) {
+      setStatus("err", "模型 " + local.model + " 未安装");
     } else {
-      setStatus("ok", "Ollama 在线 · " + d.local_model + (d.cloud_key_configured ? " · 云端 Key 已配置" : ""));
+      setStatus("ok", "本地在线 · " + local.model + (d.cloud_configured ? " · 云端已配置" : " · 未配置云端"));
     }
   } catch (e) {
     setStatus("err", "服务未响应");
@@ -273,13 +265,7 @@ async function run() {
       if (!r.ok) throw new Error(d.detail || ("HTTP " + r.status));
       renderOutput(out, d.answer, false);
     } else {
-      const body = {
-        question,
-        cloud_api_key: $("cloudKey").value.trim() || null,
-        cloud_api_base: $("cloudBase").value.trim() || null,
-        cloud_model: $("cloudModel").value.trim() || null,
-        use_mock_cloud: $("mockCloud").checked,
-      };
+      const body = { question };
       $("draftOut").textContent = "三层流水线执行中，请稍候…";
       const r = await fetch("/api/expert", {
         method: "POST",
@@ -294,7 +280,7 @@ async function run() {
       renderList($("fSubjects"), d.elements.legal_subjects);
       renderList($("fFocus"), d.elements.dispute_focus);
       renderList($("fArticles"), d.elements.legal_articles);
-      renderOutput($("draftOut"), d.cloud_draft, false);
+      renderOutput($("draftOut"), d.draft, false);
       renderOutput($("finalOut"), d.final_answer, false);
     }
   } catch (e) {
