@@ -1,8 +1,18 @@
 import json
+from pathlib import Path
+
 import pandas as pd
 
-input_file = r"C:\Users\zjz1\jackzjz_project\legal-ai-tutor\data\datasets\AI-ModelScope--DISC-Law-SFT\snapshots\master\DISC-Law-SFT-Pair.csv"
-output_file = r"C:\Users\zjz1\jackzjz_project\legal-ai-tutor\data\legal_sft_500.json"
+DATA_DIR = Path(__file__).resolve().parent
+input_file = (
+    DATA_DIR
+    / "datasets"
+    / "AI-ModelScope--DISC-Law-SFT"
+    / "snapshots"
+    / "master"
+    / "DISC-Law-SFT-Pair.csv"
+)
+output_file = DATA_DIR / "legal_sft_500.json"
 
 print("正在读取 CSV 数据，请稍候...")
 df = pd.read_csv(input_file, nrows=500)
