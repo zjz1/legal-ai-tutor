@@ -60,3 +60,8 @@ def test_model_dir_can_point_to_another_disk(tmp_path):
     settings = load_settings({"MODEL_DIR": str(tmp_path)})
     assert settings.model_dir == tmp_path
     assert settings.model_file("x.gguf") == tmp_path / "x.gguf"
+
+
+def test_cloud_redaction_defaults_on():
+    assert load_settings({}).redact_cloud is True
+    assert load_settings({"REDACT_CLOUD": "false"}).redact_cloud is False

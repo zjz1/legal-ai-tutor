@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
 from collections.abc import AsyncIterator
 from typing import Any
@@ -17,6 +18,7 @@ from pydantic import ValidationError
 from .config import Settings
 from .errors import SchemaError
 from .knowledge import HybridRetriever, LawCorpus, annotate
+from .privacy import redact, restore
 from .prompts import ELEMENTS_SCHEMA, get_prompt
 from .routing import Router
 from .schemas import AnswerResult, ChatMessage, Elements, ExpertResult
@@ -32,6 +34,33 @@ def _format_elements(elements: Elements) -> str:
             "涉及法条：" + "；".join(elements.legal_articles or ["未提及"]),
         ]
     )
+
+
+_PARTY_PREFIXES = (
+    "原告",
+    "被告",
+    "申请人",
+    "被申请人",
+    "上诉人",
+    "被上诉人",
+    "第三人",
+    "被害人",
+    "当事人",
+)
+
+
+def _party_names(elements: Elements) -> list[str]:
+    """从「法律主体」中提取当事人姓名，供出云脱敏使用。"""
+    names: list[str] = []
+    for item in elements.legal_subjects:
+        text = item.strip()
+        for prefix in _PARTY_PREFIXES:
+            if text.startswith(prefix):
+                candidate = re.sub(r"[（(].*?[）)]", "", text[len(prefix) :]).strip("：: 　")
+                if 2 <= len(candidate) <= 4:
+                    names.append(candidate)
+                break
+    return sorted(set(names), key=len, reverse=True)
 
 
 class LegalWorkflow:
@@ -57,6 +86,18 @@ class LegalWorkflow:
         query = " ".join([question, *elements.dispute_focus, *elements.legal_articles])
         retrieved = self.retriever.search(query, top_k=8)
         return self.retriever.as_context(retrieved, limit=4) or "（未检索到相关条文）"
+
+    def _redact_for_cloud(
+        self, system: str, user: str, elements: Elements
+    ) -> tuple[list[ChatMessage], dict[str, str]]:
+        """出云前脱敏：身份证/手机号/银行卡/邮箱/当事人姓名。"""
+        if not self.settings.redact_cloud:
+            return self._messages(system, user), {}
+
+        result = redact(user, names=_party_names(elements))
+        if result.changed:
+            logger.info("出云脱敏：替换 %d 处敏感信息", len(result.mapping))
+        return self._messages(system, result.text), result.mapping
 
     @staticmethod
     def _parse_elements(text: str) -> Elements:
@@ -122,9 +163,11 @@ class LegalWorkflow:
         system, user = get_prompt("analyze").render(
             elements=_format_elements(elements), context=context, question=question
         )
-        draft_result, degraded = await self.router.cloud_chat(self._messages(system, user), deadline=deadline)
+        cloud_messages, mapping = self._redact_for_cloud(system, user, elements)
+        draft_result, degraded = await self.router.cloud_chat(cloud_messages, deadline=deadline)
+        draft_text = restore(draft_result.text, mapping) if mapping else draft_result.text
 
-        polish_system, polish_user = get_prompt("polish").render(draft=draft_result.text)
+        polish_system, polish_user = get_prompt("polish").render(draft=draft_text)
         final_result = await self.router.local_chat(
             self._messages(polish_system, polish_user), deadline=deadline
         )
@@ -133,7 +176,7 @@ class LegalWorkflow:
         return ExpertResult(
             question=question,
             elements=elements,
-            draft=draft_result.text,
+            draft=draft_text,
             final_answer=final_text,
             citations=checks,
             degraded=degraded,
@@ -155,12 +198,14 @@ class LegalWorkflow:
         system, user = get_prompt("analyze").render(
             elements=_format_elements(elements), context=context, question=question
         )
-        draft_result, degraded = await self.router.cloud_chat(self._messages(system, user), deadline=deadline)
+        cloud_messages, mapping = self._redact_for_cloud(system, user, elements)
+        draft_result, degraded = await self.router.cloud_chat(cloud_messages, deadline=deadline)
+        draft_text = restore(draft_result.text, mapping) if mapping else draft_result.text
         yield {"event": "stage", "data": {"stage": "analyze", "status": "done"}}
-        yield {"event": "draft", "data": {"text": draft_result.text, "degraded": degraded}}
+        yield {"event": "draft", "data": {"text": draft_text, "degraded": degraded}}
 
         yield {"event": "stage", "data": {"stage": "polish", "status": "start"}}
-        polish_system, polish_user = get_prompt("polish").render(draft=draft_result.text)
+        polish_system, polish_user = get_prompt("polish").render(draft=draft_text)
         chunks: list[str] = []
         async for delta in self.router.stream_local(self._messages(polish_system, polish_user), deadline=deadline):
             if delta.text:

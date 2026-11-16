@@ -107,6 +107,7 @@ class Settings:
     api_token: str
     rate_limit_per_minute: int
     allow_client_key: bool
+    redact_cloud: bool
     law_dir: Path
     model_dir: Path
     log_level: str
@@ -152,6 +153,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         api_token=_get(env, "API_TOKEN", ""),
         rate_limit_per_minute=_int(env, "RATE_LIMIT_PER_MINUTE", 30, minimum=1),
         allow_client_key=_bool(env, "ALLOW_CLIENT_KEY", False),
+        redact_cloud=_bool(env, "REDACT_CLOUD", True),
         law_dir=law_dir,
         model_dir=model_dir,
         log_level=_get(env, "LOG_LEVEL", "INFO").upper(),
